@@ -1,0 +1,46 @@
+- name: Configure server and deploy app
+  hosts: app_server
+  become: yes
+
+  tasks:
+    - name: Update all packages
+      dnf:
+        name: "*"
+        state: latest
+
+    - name: Install Docker
+      dnf:
+        name: docker
+        state: present
+
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ec2-user to docker group
+      user:
+        name: ec2-user
+        groups: docker
+        append: yes
+
+    - name: Copy application files to server
+      copy:
+        src: "{{ item }}"
+        dest: /home/ec2-user/app/
+      loop:
+        - app.js
+        - package.json
+        - package-lock.json
+        - Dockerfile
+
+    - name: Build Docker image on server
+      command: docker build -t devops-project /home/ec2-user/app
+
+    - name: Remove existing container if present
+      command: docker rm -f devops-app
+      ignore_errors: yes
+
+    - name: Run the container
+      command: docker run -d -p 3000:3000 --name devops-app devops-project
